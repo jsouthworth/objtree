@@ -3,15 +3,15 @@ package objtree
 import (
 	"encoding/xml"
 	"github.com/godbus/dbus"
-	dbusintro "github.com/godbus/dbus/introspect"
-	"github.com/jsouthworth/introspect"
+	"github.com/godbus/dbus/introspect"
+	"github.com/jsouthworth/objtree/internal/reflect"
 	"sort"
 	"strings"
 )
 
 type Object struct {
 	name       string
-	impl       *introspect.Object
+	impl       *reflect.Object
 	interfaces multiWriterValue
 	listeners  multiWriterValue
 	objects    multiWriterValue
@@ -25,13 +25,13 @@ func newObjectFromTable(
 	parent *Object,
 	bus *BusManager,
 ) *Object {
-	return newObjectFromImpl(name, introspect.NewObjectFromTable(table),
+	return newObjectFromImpl(name, reflect.NewObjectFromTable(table),
 		parent, bus)
 }
 
 func newObjectFromImpl(
 	name string,
-	impl *introspect.Object,
+	impl *reflect.Object,
 	parent *Object,
 	bus *BusManager,
 ) *Object {
@@ -76,7 +76,7 @@ func (o *Object) getListeners() map[string]*Interface {
 	return o.listeners.Load().(map[string]*Interface)
 }
 
-func (o *Object) newObject(path []string, impl *introspect.Object) *Object {
+func (o *Object) newObject(path []string, impl *reflect.Object) *Object {
 	name := path[0]
 	switch len(path) {
 	case 1:
@@ -107,7 +107,7 @@ func (o *Object) NewObject(path dbus.ObjectPath, val interface{}) *Object {
 		return o
 	}
 	return o.newObject(pathToStringSlice(path),
-		introspect.NewObject(val))
+		reflect.NewObject(val))
 }
 
 func (o *Object) NewObjectFromTable(
@@ -118,7 +118,7 @@ func (o *Object) NewObjectFromTable(
 		return o
 	}
 	return o.newObject(pathToStringSlice(path),
-		introspect.NewObjectFromTable(table))
+		reflect.NewObjectFromTable(table))
 }
 
 func (o *Object) NewObjectMap(
@@ -130,7 +130,7 @@ func (o *Object) NewObjectMap(
 		return o
 	}
 	return o.newObject(pathToStringSlice(path),
-		introspect.NewObjectMapNames(val, mapfn))
+		reflect.NewObjectMapNames(val, mapfn))
 }
 
 func (o *Object) hasActions() bool {
@@ -266,7 +266,7 @@ func (o *Object) ImplementsMap(
 	mapfn func(string) string,
 ) error {
 	iface, err := o.impl.AsInterface(
-		introspect.NewInterfaceMapNames(obj, mapfn))
+		reflect.NewInterfaceMapNames(obj, mapfn))
 	if err != nil {
 		return err
 	}
@@ -278,7 +278,7 @@ func (o *Object) ImplementsTable(
 	table map[string]interface{},
 ) error {
 	iface, err := o.impl.AsInterface(
-		introspect.NewInterfaceFromTable(table))
+		reflect.NewInterfaceFromTable(table))
 	if err != nil {
 		return err
 	}
@@ -287,7 +287,7 @@ func (o *Object) ImplementsTable(
 }
 func (o *Object) implementsIface(
 	name string,
-	iface *introspect.Interface,
+	iface *reflect.Interface,
 ) error {
 	intf := &Interface{
 		name: name,
@@ -305,7 +305,7 @@ func (o *Object) Receives(
 	mapfn func(string) string,
 ) error {
 	iface, err := o.impl.AsInterface(
-		introspect.NewInterfaceMapNames(obj, mapfn))
+		reflect.NewInterfaceMapNames(obj, mapfn))
 	if err != nil {
 		return err
 	}
@@ -317,7 +317,7 @@ func (o *Object) ReceivesTable(
 	table map[string]interface{},
 ) error {
 	iface, err := o.impl.AsInterface(
-		introspect.NewInterfaceFromTable(table))
+		reflect.NewInterfaceFromTable(table))
 	if err != nil {
 		return err
 	}
@@ -326,7 +326,7 @@ func (o *Object) ReceivesTable(
 
 func (o *Object) receivesIface(
 	dbusIfaceName string,
-	iface *introspect.Interface,
+	iface *reflect.Interface,
 ) error {
 	intf := &Interface{
 		name: dbusIfaceName,
@@ -377,10 +377,10 @@ func (o *Object) Call(
 	return m.Call(args...)
 }
 
-func (o *Object) Introspect() dbusintro.Node {
-	getChildren := func() []dbusintro.Node {
+func (o *Object) Introspect() introspect.Node {
+	getChildren := func() []introspect.Node {
 		children := o.getObjects()
-		out := make([]dbusintro.Node, 0, len(children))
+		out := make([]introspect.Node, 0, len(children))
 		for _, child := range children {
 			intro := child.Introspect()
 			out = append(out, intro)
@@ -389,12 +389,12 @@ func (o *Object) Introspect() dbusintro.Node {
 		return out
 	}
 
-	getInterfaces := func() []dbusintro.Interface {
+	getInterfaces := func() []introspect.Interface {
 		if !o.hasActions() {
 			return nil
 		}
 		ifaces := o.getInterfaces()
-		out := make([]dbusintro.Interface, 0, len(ifaces))
+		out := make([]introspect.Interface, 0, len(ifaces))
 		for _, iface := range ifaces {
 			intro := iface.Introspect()
 			out = append(out, intro)
@@ -403,7 +403,7 @@ func (o *Object) Introspect() dbusintro.Node {
 		return out
 	}
 
-	node := dbusintro.Node{
+	node := introspect.Node{
 		Name:       o.name,
 		Interfaces: getInterfaces(),
 		Children:   getChildren(),
@@ -419,28 +419,28 @@ func newIntrospection(o *Object) *Interface {
 		//name attribute of the root node correctly.
 		b, _ := xml.Marshal(n)
 		declaration := strings.TrimSpace(
-			dbusintro.IntrospectDeclarationString)
+			introspect.IntrospectDeclarationString)
 		return declaration + string(b)
 	}
 
 	methods := map[string]interface{}{
 		"Introspect": intro,
 	}
-	impl, _ := introspect.NewObjectFromTable(methods).
-		AsInterface(introspect.NewInterfaceFromTable(methods))
+	impl, _ := reflect.NewObjectFromTable(methods).
+		AsInterface(reflect.NewInterfaceFromTable(methods))
 	return &Interface{
 		name: fdtIntrospectable,
 		impl: impl,
 	}
 }
 
-type interfacesByName []dbusintro.Interface
+type interfacesByName []introspect.Interface
 
 func (a interfacesByName) Len() int           { return len(a) }
 func (a interfacesByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a interfacesByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
 
-type nodesByName []dbusintro.Node
+type nodesByName []introspect.Node
 
 func (a nodesByName) Len() int           { return len(a) }
 func (a nodesByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }

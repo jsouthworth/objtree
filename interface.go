@@ -2,14 +2,14 @@ package objtree
 
 import (
 	"github.com/godbus/dbus"
-	dbusintro "github.com/godbus/dbus/introspect"
-	"github.com/jsouthworth/introspect"
+	"github.com/godbus/dbus/introspect"
+	"github.com/jsouthworth/objtree/internal/reflect"
 	"sort"
 )
 
 type Interface struct {
 	name string
-	impl *introspect.Interface
+	impl *reflect.Interface
 }
 
 func (intf *Interface) lookupMethod(name string) (*Method, bool) {
@@ -32,10 +32,10 @@ func (intf *Interface) LookupMethod(name string) (dbus.Method, bool) {
 	return method, ok
 }
 
-func (intf *Interface) Introspect() dbusintro.Interface {
-	getMethods := func() []dbusintro.Method {
+func (intf *Interface) Introspect() introspect.Interface {
+	getMethods := func() []introspect.Method {
 		methods := intf.impl.Methods()
-		out := make([]dbusintro.Method, 0, len(methods))
+		out := make([]introspect.Method, 0, len(methods))
 		for name, _ := range methods {
 			method, _ := intf.lookupMethod(name)
 			out = append(out, method.Introspect())
@@ -44,13 +44,13 @@ func (intf *Interface) Introspect() dbusintro.Interface {
 		return out
 	}
 
-	return dbusintro.Interface{
+	return introspect.Interface{
 		Name:    intf.name,
 		Methods: getMethods(),
 	}
 }
 
-type methodsByName []dbusintro.Method
+type methodsByName []introspect.Method
 
 func (a methodsByName) Len() int           { return len(a) }
 func (a methodsByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }

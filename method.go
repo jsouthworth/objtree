@@ -2,8 +2,8 @@ package objtree
 
 import (
 	"github.com/godbus/dbus"
-	dbusintro "github.com/godbus/dbus/introspect"
-	"github.com/jsouthworth/introspect"
+	"github.com/godbus/dbus/introspect"
+	ireflect "github.com/jsouthworth/objtree/internal/reflect"
 	"reflect"
 )
 
@@ -14,18 +14,18 @@ var (
 
 type Method struct {
 	name    string
-	impl    *introspect.Method
+	impl    *ireflect.Method
 	sender  string
 	message *dbus.Message
 }
 
-func (method *Method) Introspect() dbusintro.Method {
+func (method *Method) Introspect() introspect.Method {
 	getArguments := func(
 		num func() int,
 		get func(int) reflect.Type,
 		typ string,
-	) []dbusintro.Arg {
-		var args []dbusintro.Arg
+	) []introspect.Arg {
+		var args []introspect.Arg
 		for j := 0; j < num(); j++ {
 			arg := get(j)
 			if typ == "out" && j == num()-1 {
@@ -37,7 +37,7 @@ func (method *Method) Introspect() dbusintro.Method {
 				// Hide argument from introspection
 				continue
 			}
-			iarg := dbusintro.Arg{
+			iarg := introspect.Arg{
 				"",
 				dbus.SignatureOfType(arg).String(),
 				typ,
@@ -47,11 +47,11 @@ func (method *Method) Introspect() dbusintro.Method {
 		return args
 	}
 
-	intro := dbusintro.Method{
+	intro := introspect.Method{
 		Name: method.name,
-		Args: make([]dbusintro.Arg, 0,
+		Args: make([]introspect.Arg, 0,
 			method.NumArguments()+method.NumReturns()-1),
-		Annotations: make([]dbusintro.Annotation, 0),
+		Annotations: make([]introspect.Annotation, 0),
 	}
 	intro.Args = append(intro.Args,
 		getArguments(method.NumArguments,
