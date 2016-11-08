@@ -172,7 +172,7 @@ func (method *Method) Call(args ...interface{}) ([]interface{}, error) {
 	ret_values := method.value.Call(arg_values)
 	ret := valueSliceToInterfaceSlice(ret_values)
 	last := method_type.NumOut() - 1
-	if last > 0 && method_type.Out(last).Implements(errtype) {
+	if last >= 0 && method_type.Out(last).Implements(errtype) {
 		// Last parameter is of type error
 		if ret[last] != nil {
 			return ret[:last], ret[last].(error)

@@ -942,3 +942,17 @@ func TestNewInterfaceMapNames(t *testing.T) {
 		t.Fatal("should have implemented interface")
 	}
 }
+
+func TestCallOnlyErrorReturn(t *testing.T) {
+	method, err := NewMethod(func() error { return errors.New("err") })
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = method.Call()
+	if err == nil {
+		t.Fatal("should have received an error")
+	}
+	if err.Error() != "err" {
+		t.Fatal("error should have been err")
+	}
+}
