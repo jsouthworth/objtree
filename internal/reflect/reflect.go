@@ -5,6 +5,8 @@ import (
 	"reflect"
 )
 
+var errtype = reflect.TypeOf((*error)(nil)).Elem()
+
 type Object struct {
 	methods map[string]*Method
 }
@@ -166,7 +168,6 @@ func NewMethod(method interface{}) (*Method, error) {
 }
 
 func (method *Method) Call(args ...interface{}) ([]interface{}, error) {
-	errtype := reflect.TypeOf((*error)(nil)).Elem()
 	method_type := method.value.Type()
 	arg_values := interfaceSliceToValueSlice(args)
 	ret_values := method.value.Call(arg_values)
@@ -191,7 +192,12 @@ func (method *Method) NumArguments() int {
 }
 
 func (method *Method) NumReturns() int {
-	return method.value.Type().NumOut()
+	method_type := method.value.Type()
+	last := method_type.NumOut() - 1
+	if last >= 0 && method_type.Out(last).Implements(errtype) {
+		return method_type.NumOut() - 1
+	}
+	return method_type.NumOut()
 }
 
 func (method *Method) ArgumentValue(position int) interface{} {

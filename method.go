@@ -50,7 +50,7 @@ func (method *Method) Introspect() introspect.Method {
 	intro := introspect.Method{
 		Name: method.name,
 		Args: make([]introspect.Arg, 0,
-			method.NumArguments()+method.NumReturns()-1),
+			method.NumArguments()+method.NumReturns()),
 		Annotations: make([]introspect.Annotation, 0),
 	}
 	intro.Args = append(intro.Args,

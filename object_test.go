@@ -271,6 +271,43 @@ func TestTableObjectIntrospection(t *testing.T) {
 	}
 }
 
+func TestTableObjectNoReturns(t *testing.T) {
+	const introExpected = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><interface name="foo"><method name="CallMe"></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node>`
+
+	methods := map[string]interface{}{
+		"CallMe": func() {},
+	}
+	obj := newObjectFromTable("foo", methods, nil, nil)
+	if obj == nil {
+		t.Fatal("unexpected nil")
+	}
+
+	err := obj.ImplementsTable("foo", methods)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iface, exists := obj.LookupInterface(fdtIntrospectable)
+	if !exists {
+		t.Fatal("Not intropsectable")
+	}
+	method, exists := iface.LookupMethod("Introspect")
+	if !exists {
+		t.Fatal("export failed")
+	}
+
+	outs, err := method.Call()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Log(outs[0].(string))
+	expectedNode := decodeIntrospection(introExpected)
+	gotNode := decodeIntrospection(outs[0].(string))
+	if !reflect.DeepEqual(expectedNode, gotNode) {
+		t.Fatalf("expected:\n%s\ngot:\n%s", introExpected, outs[0].(string))
+	}
+}
+
 func TestTableObjectBogusMethod(t *testing.T) {
 	methods := map[string]interface{}{
 		"CallMe": "foobar",
