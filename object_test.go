@@ -237,7 +237,7 @@ func decodeIntrospection(intro string) *introspect.Node {
 
 func TestTableObjectIntrospection(t *testing.T) {
 	const introExpected = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node>`
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface></node>`
 
 	methods := map[string]interface{}{
 		"CallMe": interface{}(func() string { return "hello, world" }),
@@ -273,7 +273,7 @@ func TestTableObjectIntrospection(t *testing.T) {
 
 func TestTableObjectNoReturns(t *testing.T) {
 	const introExpected = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><interface name="foo"><method name="CallMe"></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node>`
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><interface name="foo"><method name="CallMe"></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface></node>`
 
 	methods := map[string]interface{}{
 		"CallMe": func() {},
@@ -300,7 +300,6 @@ func TestTableObjectNoReturns(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Log(outs[0].(string))
 	expectedNode := decodeIntrospection(introExpected)
 	gotNode := decodeIntrospection(outs[0].(string))
 	if !reflect.DeepEqual(expectedNode, gotNode) {
@@ -449,7 +448,7 @@ func TestObjectPathBogusInterface(t *testing.T) {
 
 func TestObjectPathMultipleObjects(t *testing.T) {
 	const introExpected = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node></node><node name="baz"><interface name="foo"><method name="call-me"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node></node></node>`
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface></node></node><node name="baz"><interface name="foo"><method name="call-me"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface></node></node></node>`
 
 	mapper := func(in string) string {
 		if in == "CallMe" {
@@ -500,7 +499,7 @@ func TestObjectPathMultipleObjects(t *testing.T) {
 
 func TestObjectPathIntrospect(t *testing.T) {
 	const introExpected = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node></node></node></node>`
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface></node></node></node></node>`
 	root := newObjectFromImpl("", nil, nil, nil)
 	methods := map[string]interface{}{
 		"CallMe": interface{}(func() string { return "hello, world" }),
@@ -555,7 +554,7 @@ func TestObjectPathDeleteSingleObject(t *testing.T) {
 
 func TestObjectPathDeleteNotExists(t *testing.T) {
 	const introExpected = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node></node></node></node>`
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface></node></node></node></node>`
 	root := newObjectFromImpl("", nil, nil, nil)
 	methods := map[string]interface{}{
 		"CallMe": interface{}(func() string { return "hello, world" }),
@@ -583,7 +582,7 @@ func TestObjectPathDeleteNotExists(t *testing.T) {
 
 func TestObjectPathDeleteMultipleObjects(t *testing.T) {
 	const introExpected = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node></node></node>`
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface></node></node></node>`
 
 	root := newObjectFromImpl("", nil, nil, nil)
 	methods := map[string]interface{}{
@@ -619,7 +618,7 @@ func TestObjectPathDeleteMultipleObjects(t *testing.T) {
 
 func TestObjectPathDeleteMultipleObjectsMiddle(t *testing.T) {
 	const introExpected = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node></node></node></node>`
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface></node></node></node></node>`
 
 	root := newObjectFromImpl("", nil, nil, nil)
 	methods := map[string]interface{}{
@@ -654,8 +653,8 @@ func TestObjectPathDeleteMultipleObjectsMiddle(t *testing.T) {
 }
 
 func TestObjectPathDeleteMultipleObjectsNonAction(t *testing.T) {
-	const introExpected = `!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node></node></node></node>`
+	const introExpected = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface></node></node></node></node>`
 
 	root := newObjectFromImpl("", nil, nil, nil)
 	methods := map[string]interface{}{
@@ -690,8 +689,8 @@ func TestObjectPathDeleteMultipleObjectsNonAction(t *testing.T) {
 }
 
 func TestObjectPathDeleteMultipleObjectsRoot(t *testing.T) {
-	const introExpected = `!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
-			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface></node></node></node></node>`
+	const introExpected = `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface><node name="call"><interface name="foo"><method name="CallMe"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface></node></node></node></node>`
 
 	root := newObjectFromImpl("", nil, nil, nil)
 	methods := map[string]interface{}{
