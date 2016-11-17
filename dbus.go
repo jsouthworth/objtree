@@ -12,6 +12,7 @@ const (
 	fdtAddMatch       = fdtDBusName + ".AddMatch"
 	fdtRemoveMatch    = fdtDBusName + ".RemoveMatch"
 	fdtIntrospectable = fdtDBusName + ".Introspectable"
+	fdtPeer           = fdtDBusName + ".Peer"
 )
 
 // Acts as a root to the object tree

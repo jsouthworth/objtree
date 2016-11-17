@@ -45,6 +45,7 @@ func newObjectFromImpl(
 	obj.listeners.value.Store(make(map[string]*Interface))
 	obj.objects.value.Store(make(map[string]*Object))
 	obj.addInterface(fdtIntrospectable, newIntrospection(obj))
+	obj.addInterface(fdtPeer, newPeer(obj))
 	return obj
 }
 
@@ -430,6 +431,25 @@ func newIntrospection(o *Object) *Interface {
 		AsInterface(reflect.NewInterfaceFromTable(methods))
 	return &Interface{
 		name: fdtIntrospectable,
+		impl: impl,
+	}
+}
+
+func newPeer(o *Object) *Interface {
+	// These are actually implemented by godbus.
+	// This gives proper introspection for the interface.
+	getMachineId := func() string {
+		return ""
+	}
+	ping := func() {}
+	methods := map[string]interface{}{
+		"Ping":         ping,
+		"GetMachineId": getMachineId,
+	}
+	impl, _ := reflect.NewObjectFromTable(methods).
+		AsInterface(reflect.NewInterfaceFromTable(methods))
+	return &Interface{
+		name: fdtPeer,
 		impl: impl,
 	}
 }
