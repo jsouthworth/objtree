@@ -956,3 +956,231 @@ func TestCallOnlyErrorReturn(t *testing.T) {
 		t.Fatal("error should have been err")
 	}
 }
+
+func TestPropertyFromTable(t *testing.T) {
+	var val int
+	objt := map[string]interface{}{
+		"Property1": &val,
+	}
+	obj := NewObjectFromTable(objt)
+	prop, ok := obj.LookupProperty("Property1")
+	if !ok {
+		t.Fatal("should have found a property")
+	}
+	err := prop.Set(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := prop.Get().(int)
+	if got != val {
+		t.Fatal("expected", val, "got", got)
+	}
+
+}
+
+func TestPropertyFromObject(t *testing.T) {
+	val := 10
+	objv := &struct {
+		Property1 int
+	}{}
+	obj := NewObject(objv)
+	prop, ok := obj.LookupProperty("Property1")
+	if !ok {
+		t.Fatal("should have found a property")
+	}
+	err := prop.Set(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := prop.Get().(int)
+	if got != val {
+		t.Fatal("expected", val, "got", got)
+	}
+
+}
+
+func TestPropertyFromNonStruct(t *testing.T) {
+	objv := map[string]string{}
+	obj := NewObject(objv)
+	_, ok := obj.LookupProperty("Property1")
+	if ok {
+		t.Fatal("should not have found a property")
+	}
+}
+
+func TestPropertyNonMatchingType(t *testing.T) {
+	objv := &struct {
+		Property1 int
+	}{}
+	obj := NewObject(objv)
+	prop, ok := obj.LookupProperty("Property1")
+	if !ok {
+		t.Fatal("should have found a property")
+	}
+	err := prop.Set("foo")
+	expected := "Value type does not match Property type"
+	got := err.Error()
+	if got != expected {
+		t.Fatal("expected", expected, "got", got)
+	}
+}
+
+func TestObjectRetrieveProperties(t *testing.T) {
+	objv := &struct {
+		Property1 int
+	}{}
+	obj := NewObject(objv)
+	props := obj.Properties()
+	_, ok := props["Property1"]
+	if !ok {
+		t.Fatal("should have found a property")
+	}
+}
+
+func TestPropertyTableAsInterface(t *testing.T) {
+	var val int
+	objt := map[string]interface{}{
+		"Property1": &val,
+	}
+	obj := NewObjectFromTable(objt)
+	if obj == nil {
+		t.Fatal("unexpected nil")
+	}
+
+	iface, err := obj.AsInterface(NewInterfaceFromTable(objt))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iface.impl != obj {
+		t.Fatal("Interface implementation should have been object")
+	}
+}
+
+func TestPropertyObjectAsInterface(t *testing.T) {
+	objv := &struct {
+		Property1 int
+	}{}
+	obj := NewObject(objv)
+	if obj == nil {
+		t.Fatal("unexpected nil")
+	}
+
+	iface, err := obj.AsInterface(NewInterface(objv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if iface.impl != obj {
+		t.Fatal("Interface implementation should have been object")
+	}
+}
+
+func TestPropertyObjectAsInterfaceTooManyProps(t *testing.T) {
+	objv := &struct {
+		Property1 int
+	}{}
+	objt := map[string]interface{}{
+		"Property1": new(int),
+		"Property2": new(int),
+	}
+	obj := NewObject(objv)
+	if obj == nil {
+		t.Fatal("unexpected nil")
+	}
+
+	_, err := obj.AsInterface(NewInterfaceFromTable(objt))
+	if err == nil {
+		t.Fatal("Object shouldn't implement interface")
+	}
+}
+
+func TestPropertyObjectAsInterfaceyMissingProp(t *testing.T) {
+	objv := &struct {
+		Property1 int
+	}{}
+	objt := map[string]interface{}{
+		"Property2": new(int),
+	}
+	obj := NewObject(objv)
+	if obj == nil {
+		t.Fatal("unexpected nil")
+	}
+
+	_, err := obj.AsInterface(NewInterfaceFromTable(objt))
+	if err == nil {
+		t.Fatal("Object shouldn't implement interface")
+	}
+}
+
+func TestPropertyObjectAsInterfaceIncorrectType(t *testing.T) {
+	objv := &struct {
+		Property1 int
+	}{}
+	objt := map[string]interface{}{
+		"Property1": new(int64),
+	}
+	obj := NewObject(objv)
+	if obj == nil {
+		t.Fatal("unexpected nil")
+	}
+
+	_, err := obj.AsInterface(NewInterfaceFromTable(objt))
+	if err == nil {
+		t.Fatal("Object shouldn't implement interface")
+	}
+}
+
+func TestPropertyNewInterfaceFromNonStruct(t *testing.T) {
+	objv := map[string]string{}
+	obj := NewObject(objv)
+
+	_, err := obj.AsInterface(NewInterface(objv))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPropertyFromInterface(t *testing.T) {
+	val := 10
+	objv := &struct {
+		Property1 int
+	}{}
+	ifacet := map[string]interface{}{
+		"Property1": new(int),
+	}
+	obj := NewObject(objv)
+	iface, err := obj.AsInterface(NewInterfaceFromTable(ifacet))
+	if err != nil {
+		t.Fatal(err)
+	}
+	prop, ok := iface.LookupProperty("Property1")
+	if !ok {
+		t.Fatal("should have found a property")
+	}
+	err = prop.Set(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := prop.Get().(int)
+	if got != val {
+		t.Fatal("expected", val, "got", got)
+	}
+
+}
+
+func TestPropertyFromInterfaceNonExist(t *testing.T) {
+	objv := &struct {
+		Property1 int
+	}{}
+	ifacet := map[string]interface{}{
+		"Property1": new(int),
+	}
+	obj := NewObject(objv)
+	iface, err := obj.AsInterface(NewInterfaceFromTable(ifacet))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ok := iface.LookupProperty("Property2")
+	if ok {
+		t.Fatal("should not have found a property")
+	}
+}

@@ -975,3 +975,151 @@ func TestObjectDeleteReceiver(t *testing.T) {
 	case <-time.After(time.Second):
 	}
 }
+
+func TestPropertyInterfaceGet(t *testing.T) {
+	root := newObjectFromImpl("", nil, nil, nil)
+	props := map[string]interface{}{
+		"Prop1": new(int),
+	}
+	obj := root.NewObjectFromTable("/foo/bar/props", props)
+	if obj == nil {
+		t.Fatal("unexpected nil")
+	}
+
+	err := obj.ImplementsTable("foo.Props", props)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iface, exists := obj.LookupInterface(fdtProperties)
+	if !exists {
+		t.Fatal("Not Property")
+	}
+	method, exists := iface.LookupMethod("Get")
+	if !exists {
+		t.Fatal("export failed")
+	}
+
+	outs, err := method.Call("foo.Props", "Prop1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outs[0].(int) != 0 {
+		t.Fatal("expected", 0, "got", outs[0].(int))
+	}
+}
+
+func TestPropertyInterfaceGetAll(t *testing.T) {
+	root := newObjectFromImpl("", nil, nil, nil)
+	prop1 := 10
+	prop2 := "foo bar"
+	props := map[string]interface{}{
+		"Prop1": &prop1,
+		"Prop2": &prop2,
+	}
+	obj := root.NewObjectFromTable("/foo/bar/props", props)
+	if obj == nil {
+		t.Fatal("unexpected nil")
+	}
+
+	err := obj.ImplementsTable("foo.Props", props)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iface, exists := obj.LookupInterface(fdtProperties)
+	if !exists {
+		t.Fatal("Not Property")
+	}
+	method, exists := iface.LookupMethod("GetAll")
+	if !exists {
+		t.Fatal("export failed")
+	}
+
+	outs, err := method.Call("foo.Props")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := outs[0].(map[string]interface{})
+	got1 := got["Prop1"].(int)
+	got2 := got["Prop2"].(string)
+	if got1 != prop1 {
+		t.Fatal("expected", prop1, "got", got1)
+	}
+	if got2 != prop2 {
+		t.Fatal("expected", prop2, "got", got2)
+	}
+}
+
+func TestPropertyInterfaceSet(t *testing.T) {
+	root := newObjectFromImpl("", nil, nil, nil)
+	prop1 := 10
+	props := map[string]interface{}{
+		"Prop1": &prop1,
+	}
+	obj := root.NewObjectFromTable("/foo/bar/props", props)
+	if obj == nil {
+		t.Fatal("unexpected nil")
+	}
+
+	err := obj.ImplementsTable("foo.Props", props)
+	if err != nil {
+		t.Fatal(err)
+	}
+	iface, exists := obj.LookupInterface(fdtProperties)
+	if !exists {
+		t.Fatal("Not Property")
+	}
+	method, exists := iface.LookupMethod("Set")
+	if !exists {
+		t.Fatal("export failed")
+	}
+
+	expected := 20
+	outs, err := method.Call("foo.Props", "Prop1", expected)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	method, exists = iface.LookupMethod("Get")
+	if !exists {
+		t.Fatal("export failed")
+	}
+
+	outs, err = method.Call("foo.Props", "Prop1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := outs[0].(int)
+	if got != expected {
+		t.Fatal("expected", expected, "got", got)
+	}
+
+}
+
+func TestPropertyIntrospect(t *testing.T) {
+	introExpected := `<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+			 "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd"><node><node name="foo"><node name="bar"><node name="props"><interface name="foo.Props"><property name="Prop1" type="i" access="readwrite"></property></interface><interface name="org.freedesktop.DBus.Introspectable"><method name="Introspect"><arg type="s" direction="out"></arg></method></interface><interface name="org.freedesktop.DBus.Peer"><method name="GetMachineId"><arg type="s" direction="out"></arg></method><method name="Ping"></method></interface><interface name="org.freedesktop.DBus.Properties"><method name="Get"><arg type="s" direction="in"></arg><arg type="s" direction="in"></arg><arg type="v" direction="out"></arg></method><method name="GetAll"><arg type="s" direction="in"></arg><arg type="a{sv}" direction="out"></arg></method><method name="Set"><arg type="s" direction="in"></arg><arg type="s" direction="in"></arg><arg type="v" direction="in"></arg></method></interface></node></node></node></node>`
+	root := newObjectFromImpl("", nil, nil, nil)
+	prop1 := int32(10)
+	props := map[string]interface{}{
+		"Prop1": &prop1,
+	}
+	obj := root.NewObjectFromTable("/foo/bar/props", props)
+	if obj == nil {
+		t.Fatal("unexpected nil")
+	}
+
+	err := obj.ImplementsTable("foo.Props", props)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outs, err := root.Call(fdtIntrospectable, "Introspect")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedNode := decodeIntrospection(introExpected)
+	gotNode := decodeIntrospection(outs[0].(string))
+	if !reflect.DeepEqual(expectedNode, gotNode) {
+		t.Fatalf("expected:\n%s\ngot:\n%s", introExpected, outs[0].(string))
+	}
+}

@@ -32,6 +32,17 @@ func (intf *Interface) LookupMethod(name string) (dbus.Method, bool) {
 	return method, ok
 }
 
+func (intf *Interface) lookupProperty(name string) (*Property, bool) {
+	prop, ok := intf.impl.LookupProperty(name)
+	if !ok {
+		return nil, ok
+	}
+	return &Property{
+		name: name,
+		impl: prop,
+	}, true
+}
+
 func (intf *Interface) Introspect() introspect.Interface {
 	getMethods := func() []introspect.Method {
 		methods := intf.impl.Methods()
@@ -44,9 +55,20 @@ func (intf *Interface) Introspect() introspect.Interface {
 		return out
 	}
 
+	getProperties := func() []introspect.Property {
+		properties := intf.impl.Properties()
+		out := make([]introspect.Property, 0, len(properties))
+		for name, _ := range properties {
+			property, _ := intf.lookupProperty(name)
+			out = append(out, property.Introspect())
+		}
+		sort.Sort(propertiesByName(out))
+		return out
+	}
 	return introspect.Interface{
-		Name:    intf.name,
-		Methods: getMethods(),
+		Name:       intf.name,
+		Methods:    getMethods(),
+		Properties: getProperties(),
 	}
 }
 
@@ -55,3 +77,9 @@ type methodsByName []introspect.Method
 func (a methodsByName) Len() int           { return len(a) }
 func (a methodsByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a methodsByName) Less(i, j int) bool { return a[i].Name < a[j].Name }
+
+type propertiesByName []introspect.Property
+
+func (a propertiesByName) Len() int           { return len(a) }
+func (a propertiesByName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a propertiesByName) Less(i, j int) bool { return a[i].Name < a[j].Name }

@@ -3,34 +3,49 @@ package reflect
 import (
 	"errors"
 	"reflect"
+	"sync"
 )
 
 var errtype = reflect.TypeOf((*error)(nil)).Elem()
 
 type Object struct {
-	methods map[string]*Method
+	properties map[string]*Property
+	methods    map[string]*Method
 }
 
 func NewObject(value interface{}) *Object {
-	return newObjectFromTable(GetMethodsFromReceiver(value),
+	return newObjectFromTable(
+		getMethodsFromReceiver(value),
+		getPropertiesFromObject(value),
 		func(in string) string { return in })
 }
 
 func NewObjectMapNames(value interface{}, mapfn func(string) string) *Object {
-	return newObjectFromTable(GetMethodsFromReceiver(value), mapfn)
+	return newObjectFromTable(
+		getMethodsFromReceiver(value),
+		getPropertiesFromObject(value),
+		mapfn)
 }
 
 func NewObjectFromTable(table map[string]interface{}) *Object {
-	return newObjectFromTable(filterMethodTable(table),
+	return newObjectFromTable(
+		getMethodsFromTable(table),
+		getPropertiesFromTable(table),
 		func(in string) string { return in })
 }
 
 func newObjectFromTable(
-	table map[string]interface{},
+	mtable map[string]interface{},
+	ptable map[string]interface{},
 	mapfn func(string) string,
 ) *Object {
 	obj := &Object{
-		methods: mapMethodValueNames(toMethodValues(table), mapfn),
+		methods: mapMethodValueNames(
+			toMethodValues(mtable),
+			mapfn),
+		properties: mapPropertyValueNames(
+			toPropertyValues(ptable),
+			mapfn),
 	}
 	return obj
 }
@@ -43,16 +58,30 @@ func (o *Object) getMethodTypes() map[string]reflect.Type {
 	return out
 }
 
+func (o *Object) getPropertyTypes() map[string]reflect.Type {
+	out := make(map[string]reflect.Type)
+	for k, v := range o.properties {
+		out[k] = v.value.Type()
+	}
+	return out
+}
+
 func (o *Object) Implements(iface *InterfaceType) bool {
 	if iface == nil {
 		return false
 	}
-	return isSubsetOfMethods(iface.methods, o.getMethodTypes())
+	return isSubsetOfMethods(iface.methods, o.getMethodTypes()) &&
+		isSubsetOfProperties(iface.properties, o.getPropertyTypes())
 }
 
 func (o *Object) LookupMethod(name string) (*Method, bool) {
 	method, ok := o.methods[name]
 	return method, ok
+}
+
+func (o *Object) LookupProperty(name string) (*Property, bool) {
+	prop, ok := o.properties[name]
+	return prop, ok
 }
 
 func (o *Object) Call(name string, args ...interface{}) ([]interface{}, error) {
@@ -77,6 +106,10 @@ func (o *Object) Methods() map[string]*Method {
 	return o.methods
 }
 
+func (o *Object) Properties() map[string]*Property {
+	return o.properties
+}
+
 type Interface struct {
 	typ  *InterfaceType
 	impl *Object
@@ -86,7 +119,8 @@ func (i *Interface) Implements(iface *InterfaceType) bool {
 	if iface == nil {
 		return false
 	}
-	return isSubsetOfMethods(iface.methods, i.typ.methods)
+	return isSubsetOfMethods(iface.methods, i.typ.methods) &&
+		isSubsetOfProperties(iface.properties, i.typ.properties)
 }
 
 func (i *Interface) LookupMethod(name string) (*Method, bool) {
@@ -95,6 +129,14 @@ func (i *Interface) LookupMethod(name string) (*Method, bool) {
 		return nil, false
 	}
 	return i.impl.LookupMethod(name)
+}
+
+func (i *Interface) LookupProperty(name string) (*Property, bool) {
+	_, ok := i.typ.properties[name]
+	if !ok {
+		return nil, false
+	}
+	return i.impl.LookupProperty(name)
 }
 
 func (i *Interface) Call(name string, args ...interface{}) ([]interface{}, error) {
@@ -115,6 +157,14 @@ func (i *Interface) AsInterface(iface *InterfaceType) (*Interface, error) {
 	}, nil
 }
 
+func (i *Interface) Properties() map[string]*Property {
+	out := make(map[string]*Property)
+	for k, _ := range i.typ.properties {
+		out[k] = i.impl.properties[k]
+	}
+	return out
+}
+
 func (i *Interface) Methods() map[string]*Method {
 	out := make(map[string]*Method)
 	for k, _ := range i.typ.methods {
@@ -124,11 +174,14 @@ func (i *Interface) Methods() map[string]*Method {
 }
 
 type InterfaceType struct {
-	methods map[string]reflect.Type
+	properties map[string]reflect.Type
+	methods    map[string]reflect.Type
 }
 
 func NewInterface(obj interface{}) *InterfaceType {
-	return newInterface(getMethodTypes(obj),
+	return newInterface(
+		getMethodTypes(obj),
+		getPropertyTypes(obj),
 		func(in string) string { return in })
 }
 
@@ -136,20 +189,27 @@ func NewInterfaceMapNames(
 	obj interface{},
 	mapfn func(string) string,
 ) *InterfaceType {
-	return newInterface(getMethodTypes(obj), mapfn)
+	return newInterface(
+		getMethodTypes(obj),
+		getPropertyTypes(obj),
+		mapfn)
 }
 
 func NewInterfaceFromTable(table map[string]interface{}) *InterfaceType {
-	return newInterface(methodTableToTypes(table),
+	return newInterface(
+		methodTableToTypes(table),
+		propertyTableToTypes(table),
 		func(in string) string { return in })
 }
 
 func newInterface(
-	table map[string]reflect.Type,
+	mtable map[string]reflect.Type,
+	ptable map[string]reflect.Type,
 	mapfn func(string) string,
 ) *InterfaceType {
 	return &InterfaceType{
-		methods: mapMethodTypeNames(table, mapfn),
+		methods:    mapTypeNames(mtable, mapfn),
+		properties: mapTypeNames(ptable, mapfn),
 	}
 }
 
@@ -228,6 +288,37 @@ func (method *Method) ReturnType(position int) reflect.Type {
 	return method.value.Type().Out(position)
 }
 
+type Property struct {
+	value reflect.Value
+	mu    sync.RWMutex
+}
+
+func NewProperty(value interface{}) *Property {
+	prop := &Property{}
+	rval := reflect.ValueOf(value)
+	if rval.Kind() == reflect.Ptr {
+		rval = rval.Elem()
+	}
+	prop.value = rval
+	return prop
+}
+
+func (p *Property) Set(value interface{}) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if reflect.TypeOf(value) != p.value.Type() {
+		return errors.New("Value type does not match Property type")
+	}
+	p.value.Set(reflect.ValueOf(value))
+	return nil
+}
+
+func (p *Property) Get() interface{} {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.value.Interface()
+}
+
 func isSubsetOfMethods(subset, set map[string]reflect.Type) bool {
 	if len(subset) > len(set) {
 		return false
@@ -257,6 +348,22 @@ func isSubsetOfMethods(subset, set map[string]reflect.Type) bool {
 	return true
 }
 
+func isSubsetOfProperties(subset, set map[string]reflect.Type) bool {
+	if len(subset) > len(set) {
+		return false
+	}
+	for property_name, iface_property_type := range subset {
+		property_type, exists := set[property_name]
+		if !exists {
+			return false
+		}
+		if iface_property_type != property_type {
+			return false
+		}
+	}
+	return true
+}
+
 func getMethodTypes(object interface{}) map[string]reflect.Type {
 	obj_type, is_iface := resolveType(object)
 	out := make(map[string]reflect.Type)
@@ -272,6 +379,30 @@ func getMethodTypes(object interface{}) map[string]reflect.Type {
 		method := obj.Method(i)
 		methodType := obj_type.Method(i)
 		out[methodType.Name] = method.Type()
+	}
+	return out
+}
+
+func getPropertyTypes(object interface{}) map[string]reflect.Type {
+	obj_type, is_iface := resolveType(object)
+	if is_iface {
+		return nil
+	}
+	out := make(map[string]reflect.Type)
+	obj := reflect.ValueOf(object)
+
+	if obj.Kind() == reflect.Ptr {
+		obj = obj.Elem()
+		obj_type = obj_type.Elem()
+	}
+
+	if obj.Kind() != reflect.Struct {
+		return nil
+	}
+	for i := 0; i < obj_type.NumField(); i++ {
+		field := obj.Field(i)
+		fieldType := obj_type.Field(i)
+		out[fieldType.Name] = field.Type()
 	}
 	return out
 }
@@ -298,7 +429,18 @@ func mapMethodValueNames(
 	return out
 }
 
-func mapMethodTypeNames(
+func mapPropertyValueNames(
+	table map[string]*Property,
+	mapfn func(string) string,
+) map[string]*Property {
+	out := make(map[string]*Property)
+	for k, v := range table {
+		out[mapfn(k)] = v
+	}
+	return out
+}
+
+func mapTypeNames(
 	table map[string]reflect.Type,
 	mapfn func(string) string,
 ) map[string]reflect.Type {
@@ -317,10 +459,33 @@ func toMethodValues(table map[string]interface{}) map[string]*Method {
 	return out
 }
 
-func filterMethodTable(table map[string]interface{}) map[string]interface{} {
+func toPropertyValues(table map[string]interface{}) map[string]*Property {
+	out := make(map[string]*Property)
+	for k, v := range table {
+		out[k] = NewProperty(v)
+	}
+	return out
+}
+
+func getMethodsFromTable(table map[string]interface{}) map[string]interface{} {
 	out := make(map[string]interface{})
 	for k, v := range table {
 		if reflect.ValueOf(v).Kind() != reflect.Func {
+			continue
+		}
+		out[k] = v
+	}
+	return out
+}
+
+func getPropertiesFromTable(table map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{})
+	for k, v := range table {
+		rval := reflect.ValueOf(v)
+		if rval.Kind() == reflect.Func {
+			continue
+		}
+		if rval.Kind() != reflect.Ptr {
 			continue
 		}
 		out[k] = v
@@ -339,7 +504,18 @@ func methodTableToTypes(table map[string]interface{}) map[string]reflect.Type {
 	return types
 }
 
-func GetMethodsFromReceiver(receiver interface{}) map[string]interface{} {
+func propertyTableToTypes(table map[string]interface{}) map[string]reflect.Type {
+	types := make(map[string]reflect.Type)
+	for name, field := range table {
+		if reflect.ValueOf(field).Kind() != reflect.Ptr {
+			continue
+		}
+		types[name] = reflect.TypeOf(field).Elem()
+	}
+	return types
+}
+
+func getMethodsFromReceiver(receiver interface{}) map[string]interface{} {
 	if receiver == nil {
 		return nil
 	}
@@ -353,6 +529,32 @@ func GetMethodsFromReceiver(receiver interface{}) map[string]interface{} {
 			continue //skip private methods
 		}
 		out[methodType.Name] = method.Interface()
+	}
+	return out
+}
+
+func getPropertiesFromObject(object interface{}) map[string]interface{} {
+	if object == nil {
+		return nil
+	}
+	out := make(map[string]interface{})
+
+	rval := reflect.ValueOf(object)
+	if rval.Kind() == reflect.Ptr {
+		rval = rval.Elem()
+	}
+	if rval.Kind() != reflect.Struct {
+		return nil
+	}
+
+	objType := rval.Type()
+	for i := 0; i < rval.NumField(); i++ {
+		fieldType := objType.Field(i)
+		if fieldType.PkgPath != "" {
+			continue //skip private fields
+		}
+		field := rval.Field(i)
+		out[fieldType.Name] = field.Addr().Interface()
 	}
 	return out
 }

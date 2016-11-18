@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"github.com/godbus/dbus"
 	"github.com/godbus/dbus/introspect"
+	"github.com/godbus/dbus/prop"
 	"github.com/jsouthworth/objtree/internal/reflect"
 	"sort"
 	"strings"
@@ -46,6 +47,9 @@ func newObjectFromImpl(
 	obj.objects.value.Store(make(map[string]*Object))
 	obj.addInterface(fdtIntrospectable, newIntrospection(obj))
 	obj.addInterface(fdtPeer, newPeer(obj))
+	if obj.impl != nil && len(obj.impl.Properties()) != 0 {
+		obj.addInterface(fdtProperties, newPropertiesInterface(obj))
+	}
 	return obj
 }
 
@@ -450,6 +454,59 @@ func newPeer(o *Object) *Interface {
 		AsInterface(reflect.NewInterfaceFromTable(methods))
 	return &Interface{
 		name: fdtPeer,
+		impl: impl,
+	}
+}
+
+func newPropertiesInterface(o *Object) *Interface {
+	methods := map[string]interface{}{
+		"Get": func(ifaceName, propName string) (interface{}, error) {
+			iface, exists := o.getInterfaces()[ifaceName]
+			if !exists {
+				return nil, prop.ErrIfaceNotFound
+			}
+
+			p, exists := iface.impl.LookupProperty(propName)
+			if !exists {
+				return nil, prop.ErrPropNotFound
+			}
+			return p.Get(), nil
+
+		},
+		"GetAll": func(ifaceName string) (map[string]interface{}, error) {
+			iface, exists := o.getInterfaces()[ifaceName]
+			if !exists {
+				return nil, prop.ErrIfaceNotFound
+			}
+			out := make(map[string]interface{})
+			for name, prop := range iface.impl.Properties() {
+				out[name] = prop.Get()
+			}
+			return out, nil
+
+		},
+		"Set": func(ifaceName, propName string, value interface{}) error {
+			iface, exists := o.getInterfaces()[ifaceName]
+			if !exists {
+				return prop.ErrIfaceNotFound
+			}
+
+			p, exists := iface.impl.LookupProperty(propName)
+			if !exists {
+				return prop.ErrPropNotFound
+			}
+			err := p.Set(value)
+			if err != nil {
+				return prop.ErrInvalidArg
+			}
+			return nil
+
+		},
+	}
+	impl, _ := reflect.NewObjectFromTable(methods).
+		AsInterface(reflect.NewInterfaceFromTable(methods))
+	return &Interface{
+		name: fdtProperties,
 		impl: impl,
 	}
 }
