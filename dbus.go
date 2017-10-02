@@ -84,6 +84,10 @@ func NewAnonymousSystemBusManager() (*BusManager, error) {
 	return NewAnonymousBusManager(dbus.SystemBusPrivateHandler)
 }
 
+func (mgr *BusManager) Conn() *dbus.Conn {
+	return mgr.conn
+}
+
 func (mgr *BusManager) RequestName(name string) error {
 	_, err := mgr.conn.RequestName(name, 0)
 	if err != nil {
